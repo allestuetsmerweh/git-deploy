@@ -1,0 +1,57 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/php:7.3-node-browsers
+
+    steps:
+      - checkout
+
+      - run: sudo apt update
+
+      - run: sudo composer self-update
+      - restore_cache:
+          keys:
+            - composer-v1-{{ checksum "composer.lock" }}
+            - composer-v1-
+      - run: composer install -n --prefer-dist
+      - save_cache:
+          key: composer-v1-{{ checksum "composer.lock" }}
+          paths:
+            - vendor
+
+      - run:
+          name: Unit tests
+          command: ./vendor/bin/codecept run unit
+
+      - run: ls -la ../.ssh
+      - run: env
+      - run: ssh-add -l
+
+      - run:
+          name: Clone test repo
+          command: |
+            git clone git@github.com:allestuetsmerweh/git-deploy-test.git ../git-deploy-test
+
+      - run:
+          name: Configure Git
+          command: |
+            cd ../git-deploy-test
+            git config user.email "git-deploy@hatt.style"
+            git config user.name "git-deploy"
+
+      - run:
+          name: Push new commit
+          command: |
+            cd ../git-deploy-test
+            date > date.txt
+            git add .
+            git commit -m 'test commit'
+            git push
+
+      - run:
+          name: Reset to initial commit
+          command: |
+            cd ../git-deploy-test
+            git reset --hard HEAD~
+            git push -f
